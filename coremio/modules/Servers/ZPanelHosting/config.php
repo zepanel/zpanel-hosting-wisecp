@@ -1,47 +1,69 @@
 <?php
 /**
- * zPanel Web Hosting & Reseller Modülü - WISECP v3 Konfigürasyonu
+ * zPanel Web Hosting & Reseller Modülü - WISECP v3 & v5 Konfigürasyonu
  * API Port: 8056, Müşteri Port: 8026, Admin Port: 8036, Webmail: 8046
  */
 return [
-    'type-version'      => '3.0',
-    'name'              => 'ZPanelHosting',
-    'readable-name'     => 'zPanel Web Hosting & Reseller Modülü',
-    'status'            => true,
-    'authors'           => 'zPanel Team',
-    'version'           => '1.0.0',
+    'name'                        => 'ZPanelHosting',
+    'readable-name'               => 'zPanel Web Hosting & Reseller Modülü',
+    'type'                        => 'hosting',
+    'type-version'                => '3.0',
+    'status'                      => true,
+    'authors'                     => 'zPanel Team',
+    'version'                     => '1.1.0',
+
+    // WISECP 3 & 5 Çift Uyumluluk Anahtarları
+    'access-hash'                 => true,
+    'use-access-hash'             => true,
+    'require-access-hash'         => true,
+    'server-info-checker'         => true,
+    'use-test-connection'         => true,
+    'server-info-port'            => true,
+    'use-port'                    => true,
+    'server-info-secure-port'     => 8056,
+    'secure-port'                 => 8056,
+    'server-info-not-secure-port' => 8056,
+    'not-secure-port'             => 8056,
+    'use-ssl'                     => true,
+
+    // Desteklenen Yetenekler (Supported Capabilities)
+    'supported'                   => [
+        'disk-bandwidth-usage',
+        'change-password',
+        'upgrade',
+    ],
 
     // Sunucu Ekleme Ekranı
-    'server-fields'     => [
-        'ip'            => [
+    'server-fields'               => [
+        'ip' => [
             'name'        => 'Sunucu IP veya Hostname',
             'type'        => 'text',
             'description' => 'zPanel Web Hosting sunucusu (Örn: 203.0.113.31 veya web01.zepanel.com)',
         ],
-        'api_port'      => [
+        'api_port' => [
             'name'        => 'Dış REST API Portu',
             'type'        => 'text',
             'default'     => '8056',
             'description' => 'zPanel Dış REST API portu (Resmi: 8056/TCP HTTPS)',
         ],
-        'client_port'   => [
+        'client_port' => [
             'name'        => 'Kullanıcı Kontrol Paneli Portu',
             'type'        => 'text',
             'default'     => '8026',
             'description' => 'Müşteri Web Kontrol Paneli Portu (Resmi: 8026/TCP HTTPS)',
         ],
-        'admin_port'    => [
+        'admin_port' => [
             'name'        => 'Bayi / Root Panel Portu',
             'type'        => 'text',
             'default'     => '8036',
             'description' => 'Bayi ve Yönetici Giriş Portu (Resmi: 8036/TCP HTTPS)',
         ],
-        'api_token'     => [
+        'api_token' => [
             'name'        => 'API Token / Gizli Anahtar',
             'type'        => 'password',
             'description' => 'zPanel API_INTERNAL_TOKEN anahtarı',
         ],
-        'secure'        => [
+        'secure' => [
             'name'        => 'SSL ile Bağlan (HTTPS)',
             'type'        => 'approval',
             'checked'     => true,
@@ -49,17 +71,17 @@ return [
     ],
 
     // Paket Tanımlama & Bağlama Ekranı
-    'options'           => [
-        'account_type'  => [
+    'options'                     => [
+        'account_type' => [
             'name'        => 'Hesap Türü',
             'type'        => 'select',
             'options'     => [
-                'hosting'   => 'Bireysel Web Hosting Hesabı',
-                'reseller'  => 'Reseller (Bayi) Yetkili Hesap',
+                'hosting'  => 'Bireysel Web Hosting Hesabı',
+                'reseller' => 'Reseller (Bayi) Yetkili Hesap',
             ],
             'description' => 'Hesabın bayi (reseller) oluşturma yetkisi olsun mu?',
         ],
-        'package_name'  => [
+        'package_name' => [
             'name'        => 'zPanel Paket Adı',
             'type'        => 'text',
             'default'     => 'default',
@@ -77,7 +99,7 @@ return [
             'default'     => '102400',
             'description' => '0 = Sınırsız',
         ],
-        'email_limit'   => [
+        'email_limit' => [
             'name'        => 'E-Posta Hesap Limiti',
             'type'        => 'text',
             'default'     => '10',
