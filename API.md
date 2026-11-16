@@ -37,3 +37,4 @@ Accept: application/json
 | `ChangePassword` / `change_password` | `PATCH` | `/v1/customers/:id` | Hesap şifresini güncelleme |
 | `ChangePackage` / `change_plan` | `PATCH` | `/v1/customers/:id` | Paket, disk ve trafik kotası güncelleme |
 | `ClientArea` / `clientArea` | Dahili | `pages/clientArea.php` | Müşteri paneli detay & tek tıkla giriş ekranı |
+
