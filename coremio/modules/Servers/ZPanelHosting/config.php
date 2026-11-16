@@ -1,7 +1,7 @@
 <?php
 /**
  * zPanel Web Hosting & Reseller Modülü - WISECP v3 Konfigürasyonu
- * API Port: 8055, Müşteri Port: 8025, Admin Port: 8035
+ * API Port: 8056, Müşteri Port: 8026, Admin Port: 8036, Webmail: 8046
  */
 return [
     'type-version'      => '3.0',

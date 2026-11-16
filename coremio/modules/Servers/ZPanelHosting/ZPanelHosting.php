@@ -144,6 +144,37 @@ class ZPanelHosting extends ServerModule
         ];
     }
 
+    public function ChangePackage($params = [])
+    {
+        $client = $this->getClient($params);
+        $username = $params['user']['username'] ?? $params['username'] ?? '';
+        $customerId = $client->findCustomerId($username);
+
+        if (!$customerId) {
+            return ['status' => 'error', 'message' => 'Kullanıcı bulunamadı.'];
+        }
+
+        $res = $client->request('PATCH', "customers/{$customerId}", [
+            'package'     => $params['package_name'] ?? 'Web Hosting',
+            'quotaMb'     => (int)($params['options']['disk_limit'] ?? 10240),
+            'bandwidthMb' => (int)($params['options']['bandwidth_limit'] ?? 102400),
+        ]);
+
+        return [
+            'status' => $res['status'] ? 'successful' : 'error',
+            'message' => $res['status'] ? 'Paket güncellendi.' : $res['message'],
+        ];
+    }
+
+    // WISECP snake_case method aliases for universal core compatibility
+    public function test($options = []) { return $this->TestConnection($options); }
+    public function create($params = []) { return $this->CreateAccount($params); }
+    public function suspend($params = []) { return $this->SuspendAccount($params); }
+    public function unsuspend($params = []) { return $this->UnsuspendAccount($params); }
+    public function terminate($params = []) { return $this->TerminateAccount($params); }
+    public function change_password($params = []) { return $this->ChangePassword($params); }
+    public function change_plan($params = []) { return $this->ChangePackage($params); }
+
     public function ClientArea($params = [])
     {
         $domain   = $params['domain'] ?? '';
