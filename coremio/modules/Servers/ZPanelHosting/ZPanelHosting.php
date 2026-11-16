@@ -1,13 +1,8 @@
 <?php
 /**
- * zPanel Web Hosting & Reseller Automation Server Module for WISECP V3
+ * zPanel Web Hosting Server Module for WISECP V3
  * Reference: https://github.com/wisecp-v3/sample-server-module
- * 
- * zPanel Resmi Listener Portları:
- * - Müşteri Kontrol Paneli: 8026 (HTTPS)
- * - Bayi / Root Yönetici Paneli: 8036 (HTTPS)
- * - Webmail: 8046 (HTTPS)
- * - Güvenli Dış REST API: 8056 (HTTPS)
+ * Port Mimarisi: 8026 (Client), 8036 (Root), 8046 (Webmail), 8056 (API)
  */
 
 if (!class_exists('ServerModule')) {
@@ -16,100 +11,165 @@ if (!class_exists('ServerModule')) {
     }
 }
 
+require_once __DIR__ . '/lib/ApiClient.php';
+use Coremio\Modules\Servers\ZPanelHosting\Lib\ApiClient;
+
 class ZPanelHosting extends ServerModule
 {
-    public function __construct()
+    private function getClient(array $params): ApiClient
     {
-        parent::__construct();
+        $server = $params['server'] ?? [];
+        $host   = $server['ip'] ?? $server['hostname'] ?? $params['domain'] ?? '';
+        $apiKey = $server['password'] ?? $server['access_hash'] ?? '';
+        return new ApiClient($host, $apiKey, 8056);
     }
 
     public function TestConnection($options = [])
     {
         $host   = $options['ip'] ?? $options['hostname'] ?? '';
         $apiKey = $options['api_key'] ?? $options['password'] ?? '';
-        $port   = 8056;
+        $client = new ApiClient($host, $apiKey, 8056);
 
-        if (empty($host) || empty($apiKey)) {
-            return [
-                'status' => 'error',
-                'message' => 'Sunucu IP/Host veya zPanel API Token eksik.',
-            ];
+        $res = $client->testConnection();
+        if ($res['status']) {
+            return ['status' => 'successful', 'message' => "zPanel Hosting API bağlantısı başarılı ({$host}:8056)."];
         }
-
-        return [
-            'status' => 'successful',
-            'message' => "zPanel Hosting API bağlantısı sağlandı ({$host}:{$port}).",
-        ];
+        return ['status' => 'error', 'message' => $res['message'] ?: 'Bağlantı kurulamadı.'];
     }
 
     public function CreateAccount($params = [])
     {
-        $domain     = $params['domain'] ?? '';
-        $username   = $params['username'] ?? '';
-        $password   = $params['password'] ?? '';
-        $isReseller = !empty($params['configoptions']['is_reseller']) || ($params['package_type'] ?? '') === 'reseller';
+        $client = $this->getClient($params);
+        $username = $params['user']['username'] ?? $params['username'] ?? '';
+        $password = $params['user']['password'] ?? $params['password'] ?? '';
+        $domain   = $params['domain'] ?? '';
+        $email    = $params['user']['email'] ?? "{$username}@{$domain}";
+        $fullName = trim(($params['user']['name'] ?? '') . ' ' . ($params['user']['surname'] ?? ''));
+
+        // 1. Müşteri Hesabı Oluştur
+        $custRes = $client->request('POST', 'customers', [
+            'username'    => $username,
+            'password'    => $password,
+            'displayName' => $fullName ?: $username,
+            'email'       => $email,
+        ]);
+
+        if (!$custRes['status']) {
+            return ['status' => 'error', 'message' => $custRes['message'] ?: 'Kullanıcı hesabı açılamadı.'];
+        }
+
+        $customerId = $custRes['data']['customer']['id'] ?? $client->findCustomerId($username);
+
+        // 2. Alan Adı Ekle
+        if (!empty($domain) && !empty($customerId)) {
+            $client->request('POST', 'domains', [
+                'name'    => $domain,
+                'ownerId' => $customerId,
+                'kind'    => 'domain',
+            ]);
+        }
 
         return [
             'status' => 'successful',
-            'message' => $isReseller ? 'zPanel Bayi (Reseller) hesabı oluşturuldu.' : 'zPanel Web Hosting hesabı oluşturuldu.',
+            'message' => 'Web hosting hesabı ve alan adı başarıyla oluşturuldu.',
         ];
     }
 
     public function SuspendAccount($params = [])
     {
-        return ['status' => 'successful', 'message' => 'Hosting hesabı askıya alındı.'];
+        $client = $this->getClient($params);
+        $username = $params['user']['username'] ?? $params['username'] ?? '';
+        $customerId = $client->findCustomerId($username);
+
+        if (!$customerId) {
+            return ['status' => 'successful', 'message' => 'Hesap zaten mevcut değil.'];
+        }
+
+        $res = $client->request('PATCH', "customers/{$customerId}", ['status' => 'suspended']);
+        return [
+            'status' => $res['status'] ? 'successful' : 'error',
+            'message' => $res['status'] ? 'Hesap askıya alındı.' : $res['message'],
+        ];
     }
 
     public function UnsuspendAccount($params = [])
     {
-        return ['status' => 'successful', 'message' => 'Hosting hesabı aktif edildi.'];
+        $client = $this->getClient($params);
+        $username = $params['user']['username'] ?? $params['username'] ?? '';
+        $customerId = $client->findCustomerId($username);
+
+        if (!$customerId) {
+            return ['status' => 'error', 'message' => 'Hesap bulunamadı.'];
+        }
+
+        $res = $client->request('PATCH', "customers/{$customerId}", ['status' => 'active']);
+        return [
+            'status' => $res['status'] ? 'successful' : 'error',
+            'message' => $res['status'] ? 'Hesap aktif edildi.' : $res['message'],
+        ];
     }
 
     public function TerminateAccount($params = [])
     {
-        return ['status' => 'successful', 'message' => 'Hosting hesabı ve veritabanları silindi.'];
+        $client = $this->getClient($params);
+        $username = $params['user']['username'] ?? $params['username'] ?? '';
+        $customerId = $client->findCustomerId($username);
+
+        if (!$customerId) {
+            return ['status' => 'successful', 'message' => 'Hesap zaten silinmiş.'];
+        }
+
+        $res = $client->request('DELETE', "customers/{$customerId}");
+        return [
+            'status' => $res['status'] ? 'successful' : 'error',
+            'message' => $res['status'] ? 'Hesap silindi.' : $res['message'],
+        ];
     }
 
     public function ChangePassword($params = [])
     {
-        return ['status' => 'successful', 'message' => 'Hosting / FTP şifresi güncellendi.'];
+        $client = $this->getClient($params);
+        $username = $params['user']['username'] ?? $params['username'] ?? '';
+        $newPass  = $params['password'] ?? '';
+        $customerId = $client->findCustomerId($username);
+
+        if (!$customerId) {
+            return ['status' => 'error', 'message' => 'Kullanıcı bulunamadı.'];
+        }
+
+        $res = $client->request('PATCH', "customers/{$customerId}", ['password' => $newPass]);
+        return [
+            'status' => $res['status'] ? 'successful' : 'error',
+            'message' => $res['status'] ? 'Şifre güncellendi.' : $res['message'],
+        ];
     }
 
-    /**
-     * Müşteri Alanı Görünümü (Standart Hosting & Reseller)
-     * Kurulan hizmetin dinamik domain, sunucu IP ve resmi zPanel portlarıyla çalışır.
-     */
     public function ClientArea($params = [])
     {
-        $domain      = $params['domain'] ?? '';
-        $serverIp    = $params['server_ip'] ?? $params['server']['ip'] ?? $params['ip'] ?? '';
-        $panelHost   = !empty($domain) ? $domain : $serverIp;
-        $isReseller  = !empty($params['configoptions']['is_reseller']) || ($params['package_type'] ?? '') === 'reseller';
-
-        $panelPort   = $isReseller ? 8036 : 8026;
+        $domain   = $params['domain'] ?? '';
+        $serverIp = $params['options']['server_ip'] ?? $params['server']['ip'] ?? '';
+        $panelHost = !empty($domain) ? $domain : $serverIp;
+        $clientPort = 8026;
         $webmailPort = 8046;
 
-        $ssoToken    = bin2hex(random_bytes(16));
-        $ssoLink     = !empty($panelHost) ? "https://{$panelHost}:{$panelPort}/auth/sso?token={$ssoToken}" : '#';
-        $webmailLink = !empty($panelHost) ? "https://{$panelHost}:{$webmailPort}" : '#';
+        $ssoUrl = !empty($panelHost) ? "https://{$panelHost}:{$clientPort}" : '#';
+        $webmailUrl = !empty($panelHost) ? "https://{$panelHost}:{$webmailPort}" : '#';
 
         return [
             'template' => 'pages/clientArea.php',
             'data' => [
                 'domain'        => $domain,
-                'username'      => $params['username'] ?? '',
-                'password'      => $params['password'] ?? '',
+                'username'      => $params['user']['username'] ?? $params['username'] ?? '',
+                'password'      => $params['user']['password'] ?? $params['password'] ?? '',
                 'server_ip'     => $serverIp,
                 'panel_host'    => $panelHost,
-                'panel_port'    => $panelPort,
+                'client_port'   => $clientPort,
                 'webmail_port'  => $webmailPort,
-                'is_reseller'   => $isReseller,
-                'package'       => $params['package_name'] ?? $params['package'] ?? ($isReseller ? 'Reseller Hosting' : 'Limitsiz Web Hosting'),
-                'status'        => $params['status'] ?? 'Active',
-                'sso_link'      => $ssoLink,
-                'webmail_link'  => $webmailLink,
+                'sso_url'       => $ssoUrl,
+                'webmail_url'   => $webmailUrl,
+                'status'        => $params['status'] ?? 'active',
+                'package_name'  => $params['package_name'] ?? 'Web Hosting',
             ],
         ];
     }
 }
-
