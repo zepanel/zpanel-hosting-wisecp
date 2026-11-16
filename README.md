@@ -1,4 +1,4 @@
-﻿# zPanel Web Hosting & Reseller ServerModule for WISECP V3
+# zPanel Web Hosting & Reseller ServerModule for WISECP V3
 
 WISECP v3 için zPanel Web Hosting ve Bayi (Reseller) hesap yönetim modülü.
 
